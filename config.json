@@ -18,12 +18,6 @@
       "regionCode": "GB",
       "language": "en",
       "queries": "world"
-    },
-    {
-      "label": "DE",
-      "regionCode": "DE",
-      "language": "de",
-      "queries": "world"
     }
   ],
   "queries": {

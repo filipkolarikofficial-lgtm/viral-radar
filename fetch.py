@@ -13,6 +13,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -24,8 +26,15 @@ API = "https://www.googleapis.com/youtube/v3/"
 def api(endpoint, **params):
     params["key"] = os.environ["YOUTUBE_API_KEY"]
     url = API + endpoint + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=30) as r:
-        return json.load(r)
+    for attempt in range(4):
+        try:
+            time.sleep(0.5)
+            with urllib.request.urlopen(url, timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 503) or attempt == 3:
+                raise
+            time.sleep(5 * (attempt + 1))
 
 
 def parse_duration(iso):
