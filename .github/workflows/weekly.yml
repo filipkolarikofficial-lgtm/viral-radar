@@ -1,0 +1,29 @@
+name: Týdenní přehled
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # každé pondělí 06:00 UTC
+  workflow_dispatch: {}    # tlačítko "Run workflow" pro ruční spuštění
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stáhnout data z YouTube
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python fetch.py
+      - name: Uložit výsledek
+        run: |
+          git config user.name "viral-radar"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs
+          git diff --cached --quiet || git commit -m "Týdenní aktualizace"
+          git push

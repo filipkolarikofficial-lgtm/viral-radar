@@ -1,0 +1,33 @@
+{
+  "days_back": 14,
+  "max_duration_seconds": 60,
+  "min_views": 5000,
+  "max_subscribers": 50000,
+  "min_ratio": 3,
+  "results_per_query": 25,
+  "max_rows": 60,
+  "regions": [
+    {"label": "CZ", "regionCode": "CZ", "language": "cs", "queries": "cz"},
+    {"label": "Svět", "regionCode": "US", "language": "en", "queries": "world"}
+  ],
+  "queries": {
+    "cz": [
+      "kapela koncert #shorts",
+      "cover písničky #shorts",
+      "zkouška kapely #shorts",
+      "hudebník kytara #shorts",
+      "zpěvačka cover #shorts",
+      "backstage kapela #shorts"
+    ],
+    "world": [
+      "band live concert #shorts",
+      "band rehearsal #shorts",
+      "backstage band #shorts",
+      "cover song #shorts",
+      "guitar cover #shorts",
+      "band reacts #shorts",
+      "drummer #shorts",
+      "small band going viral #shorts"
+    ]
+  }
+}
