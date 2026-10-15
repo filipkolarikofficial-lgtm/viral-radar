@@ -112,6 +112,7 @@ def chunks(seq, n):
 def collect(cfg):
     after = (datetime.now(timezone.utc) - timedelta(days=cfg["days_back"])).strftime("%Y-%m-%dT%H:%M:%SZ")
     ids = {}  # video_id -> region label
+    ok = 0
     for region in cfg["regions"]:
         for q in cfg["queries"][region["queries"]]:
             params = dict(part="id", type="video", videoDuration="short", order=region.get("order", "viewCount"),
@@ -125,8 +126,11 @@ def collect(cfg):
             except Exception as e:  # kvóta, síť...
                 print("search selhalo pro '%s': %s" % (q, e), file=sys.stderr)
                 continue
+            ok += 1
             for it in res.get("items", []):
                 ids.setdefault(it["id"]["videoId"], region["label"])
+    if ok == 0:
+        sys.exit("Žádné vyhledávání neuspělo (pravděpodobně vyčerpaná denní kvóta YouTube API). Stávající data zůstávají beze změny.")
 
     seed_ids = set()
     for ref in cfg.get("seed_channels", []):
@@ -315,6 +319,8 @@ def main():
         if not os.environ.get("YOUTUBE_API_KEY"):
             sys.exit("Chybí proměnná YOUTUBE_API_KEY.")
         rows = collect(cfg)
+        if not rows:
+            sys.exit("Nenalezeno žádné video, stávající data zůstávají beze změny.")
     out = os.path.join(HERE, "docs")
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, "data.json"), "w", encoding="utf-8") as f:
