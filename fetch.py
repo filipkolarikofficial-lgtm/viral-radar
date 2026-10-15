@@ -36,6 +36,42 @@ def parse_duration(iso):
     return h * 3600 + mi * 60 + s
 
 
+CZ_CHARS = set("ěščřžťďňůĚŠČŘŽŤĎŇŮ")
+CZ_WORDS = {"je", "se", "na", "že", "jsme", "jsem", "kapela", "koncert", "zkouška", "píseň", "písnička",
+            "nová", "nový", "máme", "tak", "ale", "jako", "pro", "když", "naše", "zpěvák", "zpěvačka", "klip"}
+
+
+def is_czech(snippet):
+    if snippet.get("defaultAudioLanguage", "").startswith("cs") or snippet.get("defaultLanguage", "").startswith("cs"):
+        return True
+    text = (snippet.get("title", "") + " " + snippet.get("description", "")[:300]).lower()
+    if sum(1 for c in text if c in CZ_CHARS) >= 2:
+        return True
+    return len(set(re.findall(r"\w+", text)) & CZ_WORDS) >= 2
+
+
+def why(r, title):
+    t = title.lower()
+    parts = []
+    if re.search(r"who sang|better|vs\.?|which|rate|\?", t):
+        parts.append("hook ve formě otázky nebo srovnání, který láká k odpovědi v komentářích")
+    if re.search(r"rehears|practice|zkou|backstage|bts|zákulis", t):
+        parts.append("zákulisí nebo zkouška: působí autenticky a nepotřebuje produkci")
+    if re.search(r"cover|předělávk", t):
+        parts.append("cover známé písně, kterou lidi aktivně hledají")
+    if re.search(r"live|koncert|concert|solo", t):
+        parts.append("živý záběr nebo sólo, hlavní je výkon")
+    if re.search(r"😂|funny|meme|vtip|🤣", t):
+        parts.append("humor, který se snadno sdílí")
+    if r["views"] and r["likes"] is not None and r["likes"] / r["views"] > 0.06:
+        parts.append("nadprůměrný poměr lajků (%d %%) – diváci video opravdu přijali" % round(100 * r["likes"] / r["views"]))
+    if r["comments"] is not None and r["views"] and r["comments"] / r["views"] > 0.004:
+        parts.append("hodně komentářů, video vyvolává reakce")
+    if not parts:
+        parts.append("důvod z názvu nepoznám, podívej se na prvních 3 sekundy videa")
+    return "; ".join(parts[:3]).capitalize() + "."
+
+
 def chunks(seq, n):
     seq = list(seq)
     for i in range(0, len(seq), n):
@@ -60,6 +96,21 @@ def collect(cfg):
                 continue
             for it in res.get("items", []):
                 ids.setdefault(it["id"]["videoId"], region["label"])
+
+    seed_ids = set()
+    for ref in cfg.get("seed_channels", []):
+        p = dict(part="contentDetails", forHandle=ref) if ref.startswith("@") else dict(part="contentDetails", id=ref)
+        try:
+            res = api("channels", **p)
+            for ch in res.get("items", []):
+                pl = ch["contentDetails"]["relatedPlaylists"]["uploads"]
+                items = api("playlistItems", part="contentDetails", playlistId=pl, maxResults=15).get("items", [])
+                for it in items:
+                    if it["contentDetails"].get("videoPublishedAt", "9999") >= after:
+                        ids.setdefault(it["contentDetails"]["videoId"], "Sledované")
+                        seed_ids.add(it["contentDetails"]["videoId"])
+        except Exception as e:
+            print("seed kanál selhal %s: %s" % (ref, e), file=sys.stderr)
 
     videos = {}
     for batch in chunks(ids, 50):
@@ -87,12 +138,16 @@ def collect(cfg):
         subs = None if hidden or "subscriberCount" not in ch else int(ch["subscriberCount"])
         if views < cfg["min_views"]:
             continue
-        if subs is None or subs > cfg["max_subscribers"]:
+        seed = vid in seed_ids
+        if subs is None or (subs > cfg["max_subscribers"] and not seed):
             continue
         ratio = views / max(subs, 1)
-        if ratio < cfg["min_ratio"]:
+        if ratio < cfg["min_ratio"] and not seed:
             continue
-        rows.append({
+        czech = is_czech(v["snippet"])
+        if cfg.get("czech_only_for_cz") and ids[vid] == "CZ" and not czech:
+            continue
+        row = {
             "id": vid,
             "url": "https://www.youtube.com/shorts/" + vid,
             "title": v["snippet"]["title"],
@@ -105,9 +160,11 @@ def collect(cfg):
             "published": v["snippet"]["publishedAt"][:10],
             "duration": dur,
             "ratio": round(ratio, 1),
-            "market": ids[vid],
+            "market": "Sledované" if seed else ("CZ" if czech else "Svět"),
             "fetched": fetched,
-        })
+        }
+        row["why"] = why(row, v["snippet"]["title"])
+        rows.append(row)
     rows.sort(key=lambda r: r["ratio"], reverse=True)
     return rows[:cfg["max_rows"]]
 
@@ -119,7 +176,7 @@ def mock_rows():
         "author_url": "#", "subscribers": 1200 * i, "views": 250000 // i, "likes": 9000 // i,
         "comments": 300 // i, "published": datetime.now().strftime("%Y-%m-%d"), "duration": 30,
         "ratio": round((250000 // i) / (1200 * i), 1), "market": "CZ" if i % 2 else "Svět",
-        "fetched": "mock",
+        "fetched": "mock", "why": "Ukázkový text.",
     } for i in range(1, 7)]
 
 
@@ -135,13 +192,13 @@ def render(rows, cfg):
             '<td><a href="{url}" target="_blank" rel="noopener">{title}</a><div class="sub">{published} · {market}</div></td>'
             '<td><a href="{author_url}" target="_blank" rel="noopener">{author}</a></td>'
             '<td class="n">{subs}</td><td class="n">{views}</td><td class="n">{likes}</td><td class="n">{comments}</td>'
-            '<td class="n"><b>{ratio}×</b></td>'
+            '<td class="n"><b>{ratio}×</b></td><td class="why">{why}</td>'
             '<td><input type="text" class="note" placeholder="poznámka…"></td></tr>'.format(
                 id=html.escape(r["id"]), url=html.escape(r["url"]), title=html.escape(r["title"]),
                 published=r["published"], market=html.escape(r["market"]),
                 author_url=html.escape(r["author_url"]), author=html.escape(r["author"]),
                 subs=fmt(r["subscribers"]), views=fmt(r["views"]), likes=fmt(r["likes"]),
-                comments=fmt(r["comments"]), ratio=r["ratio"]))
+                comments=fmt(r["comments"]), ratio=r["ratio"], why=html.escape(r.get("why", ""))))
     updated = rows[0]["fetched"] if rows else "–"
     page = PAGE.replace("%%ROWS%%", "\n".join(trs)).replace("%%UPDATED%%", html.escape(updated)) \
         .replace("%%COUNT%%", str(len(rows))).replace("%%MAXSUBS%%", fmt(cfg["max_subscribers"])) \
@@ -161,26 +218,26 @@ h1{font-size:22px;margin:0 0 4px}p.meta{color:var(--mut);margin:0 0 16px}
 .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 button{font:inherit;padding:6px 12px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;cursor:pointer}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
-table{border-collapse:collapse;width:100%;min-width:760px}
+table{border-collapse:collapse;width:100%;min-width:960px}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 a{color:var(--acc)}.sub{color:var(--mut);font-size:12px}
 tr.sel{background:color-mix(in srgb,var(--acc) 12%,transparent)}
 .note{width:100%;min-width:130px;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--fg)}
-.foot{color:var(--mut);font-size:13px;margin-top:16px}
+.why{font-size:13px;color:var(--mut);min-width:220px}.foot{color:var(--mut);font-size:13px;margin-top:16px}
 </style></head><body><main>
 <h1>Virální krátká videa (YouTube Shorts)</h1>
 <p class="meta">Aktualizováno: %%UPDATED%% · %%COUNT%% videí z posledních %%DAYS%% dní · autoři do %%MAXSUBS%% odběratelů · řazeno podle poměru zhlédnutí ku odběratelům</p>
 <div class="bar"><button id="only">Jen vybraná</button><button id="all">Všechna</button>
 <a href="videos.csv">Stáhnout CSV</a><span id="cnt" class="sub"></span></div>
 <div class="wrap"><table><thead><tr><th></th><th>Video</th><th>Autor</th><th class="n">Odběratelé</th>
-<th class="n">Zhlédnutí</th><th class="n">Lajky</th><th class="n">Komentáře</th><th class="n">Poměr</th><th>Poznámka</th></tr></thead>
+<th class="n">Zhlédnutí</th><th class="n">Lajky</th><th class="n">Komentáře</th><th class="n">Poměr</th><th>Proč to (asi) funguje</th><th>Poznámka</th></tr></thead>
 <tbody>
 %%ROWS%%
 </tbody></table></div>
 <p class="foot">Čísla pocházejí z oficiálního YouTube Data API v době aktualizace. Výběr a poznámky se ukládají jen v tomto prohlížeči.
-„Poměr“ = zhlédnutí ÷ odběratelé autora; vysoký poměr naznačuje, že video funguje díky nápadu, ne velkému účtu.</p>
+„Proč to funguje“ je automatický odhad podle názvu a čísel, ne ověřený fakt. „Poměr“ = zhlédnutí ÷ odběratelé autora; vysoký poměr naznačuje, že video funguje díky nápadu, ne velkému účtu.</p>
 </main>
 <script>
 var K="vr-state",S={};try{S=JSON.parse(localStorage.getItem(K)||"{}")}catch(e){}

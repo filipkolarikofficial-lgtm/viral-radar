@@ -7,17 +7,30 @@
   "results_per_query": 25,
   "max_rows": 60,
   "regions": [
-    {"label": "CZ", "regionCode": "CZ", "language": "cs", "queries": "cz"},
-    {"label": "Svět", "regionCode": "US", "language": "en", "queries": "world"}
+    {
+      "label": "CZ",
+      "regionCode": "CZ",
+      "language": "cs",
+      "queries": "cz"
+    },
+    {
+      "label": "Svět",
+      "regionCode": "US",
+      "language": "en",
+      "queries": "world"
+    }
   ],
   "queries": {
     "cz": [
-      "kapela koncert #shorts",
-      "cover písničky #shorts",
-      "zkouška kapely #shorts",
-      "hudebník kytara #shorts",
-      "zpěvačka cover #shorts",
-      "backstage kapela #shorts"
+      "pop rock kapela koncert #shorts",
+      "česká kapela zkouška #shorts",
+      "cover písničky česky #shorts",
+      "zpěvačka zpěvák cover česky #shorts",
+      "kytara cover #shorts česky",
+      "bubeník #shorts",
+      "kapela zákulisí #shorts",
+      "nový klip kapela #shorts",
+      "duet česky cover #shorts"
     ],
     "world": [
       "band live concert #shorts",
@@ -29,5 +42,7 @@
       "drummer #shorts",
       "small band going viral #shorts"
     ]
-  }
+  },
+  "czech_only_for_cz": true,
+  "seed_channels": []
 }
