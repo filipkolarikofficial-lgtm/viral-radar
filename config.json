@@ -13,7 +13,8 @@
       "language": "cs",
       "queries": "cz",
       "min_views": 1500,
-      "min_ratio": 2
+      "min_ratio": 2,
+      "order": "relevance"
     },
     {
       "label": "Svět",

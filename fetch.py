@@ -83,7 +83,7 @@ def collect(cfg):
     ids = {}  # video_id -> region label
     for region in cfg["regions"]:
         for q in cfg["queries"][region["queries"]]:
-            params = dict(part="id", type="video", videoDuration="short", order="viewCount",
+            params = dict(part="id", type="video", videoDuration="short", order=region.get("order", "viewCount"),
                           publishedAfter=after, q=q, maxResults=cfg["results_per_query"])
             if region.get("regionCode"):
                 params["regionCode"] = region["regionCode"]
