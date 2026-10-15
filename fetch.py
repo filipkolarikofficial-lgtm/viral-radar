@@ -72,6 +72,28 @@ def why(r, title):
     return "; ".join(parts[:3]).capitalize() + "."
 
 
+FORMATS = [
+    ("Srovnání / otázka", r"who sang|better|vs\.?|which|rate|\?|choose|pick",
+     "Zahrajte nebo zazpívejte stejnou pasáž dvěma způsoby (např. česky a anglicky, akusticky a naplno) a zeptejte se, která verze je lepší. Výhoda: komentáře."),
+    ("Zkouška / zákulisí", r"rehears|practice|backstage|bts|soundcheck|behind the scenes|tour bus|before the show",
+     "Natočte 15–20 s ze zkoušky nebo zákulisí: jeden konkrétní okamžik (chyba, smích, nový nápad), ne celou písničku. Telefon na stativ, bez střihu."),
+    ("Cover", r"cover|acoustic|unplugged",
+     "Vezměte známou písničku a udělejte ji ve stylu Fate Magazine (pop-rock aranž, duet, jiný jazyk). Prvních 2 s musí být refrén nebo hlavní hook."),
+    ("Živě / sólo", r"live|concert|solo|stage|festival|gig",
+     "Vyberte 15 s z koncertu s největší energií (refrén, sólo, reakce publika). Titulek s jednou větou, co se tam stalo."),
+    ("Humor / situace", r"😂|🤣|funny|meme|relatable|pov|when ",
+     "Krátká vtipná scénka z života kapely (POV: zkouška, cesta na koncert, technika). Postačí jedna replika a reakce."),
+]
+
+
+def fmt_tag(title):
+    t = title.lower()
+    for name, pat, idea in FORMATS:
+        if re.search(pat, t):
+            return name, idea
+    return "Jiné", "Podívejte se na prvních 3 sekundy: co dělá hook? Zkuste stejný princip s vlastní písničkou."
+
+
 def chunks(seq, n):
     seq = list(seq)
     for i in range(0, len(seq), n):
@@ -153,6 +175,9 @@ def collect(cfg):
         ratio = views / max(subs, 1)
         if ratio < min_ratio and not seed:
             continue
+        low = (v["snippet"]["title"] + " " + v["snippet"]["channelTitle"]).lower()
+        if any(w in low for w in cfg.get("exclude_words", [])):
+            continue
         czech = is_czech(v["snippet"])
         if cfg.get("czech_only_for_cz") and ids[vid] == "CZ" and not czech:
             continue
@@ -173,9 +198,16 @@ def collect(cfg):
             "fetched": fetched,
         }
         row["why"] = why(row, v["snippet"]["title"])
+        row["format"], row["idea"] = fmt_tag(v["snippet"]["title"])
         rows.append(row)
     rows.sort(key=lambda r: r["ratio"], reverse=True)
-    return rows[:cfg["max_rows"]]
+    out, per = [], {}
+    for r in rows:
+        if per.get(r["author_url"], 0) >= cfg.get("max_per_channel", 2):
+            continue
+        per[r["author_url"]] = per.get(r["author_url"], 0) + 1
+        out.append(r)
+    return out[:cfg["max_rows"]]
 
 
 def mock_rows():
@@ -185,7 +217,7 @@ def mock_rows():
         "author_url": "#", "subscribers": 1200 * i, "views": 250000 // i, "likes": 9000 // i,
         "comments": 300 // i, "published": datetime.now().strftime("%Y-%m-%d"), "duration": 30,
         "ratio": round((250000 // i) / (1200 * i), 1), "market": "CZ" if i % 2 else "Svět",
-        "fetched": "mock", "why": "Ukázkový text.",
+        "fetched": "mock", "why": "Ukázkový text.", "format": "Cover", "idea": "Ukázka.",
     } for i in range(1, 7)]
 
 
@@ -198,16 +230,17 @@ def render(rows, cfg):
     for r in rows:
         trs.append(
             '<tr data-id="{id}"><td><input type="checkbox" class="pick" aria-label="Vybrat"></td>'
-            '<td><a href="{url}" target="_blank" rel="noopener">{title}</a><div class="sub">{published} · {market}</div></td>'
+            '<td class="vid"><a href="{url}" target="_blank" rel="noopener"><img src="https://i.ytimg.com/vi/{id}/mqdefault.jpg" alt="" loading="lazy"></a>'
+            '<div><a href="{url}" target="_blank" rel="noopener">{title}</a><div class="sub">{published} · <span class="tag">{format}</span></div></div></td>'
             '<td><a href="{author_url}" target="_blank" rel="noopener">{author}</a></td>'
             '<td class="n">{subs}</td><td class="n">{views}</td><td class="n">{likes}</td><td class="n">{comments}</td>'
-            '<td class="n"><b>{ratio}×</b></td><td class="why">{why}</td>'
+            '<td class="n"><b>{ratio}×</b></td><td class="why">{why}</td><td class="why idea">{idea}</td>'
             '<td><input type="text" class="note" placeholder="poznámka…"></td></tr>'.format(
                 id=html.escape(r["id"]), url=html.escape(r["url"]), title=html.escape(r["title"]),
                 published=r["published"], market=html.escape(r["market"]),
                 author_url=html.escape(r["author_url"]), author=html.escape(r["author"]),
                 subs=fmt(r["subscribers"]), views=fmt(r["views"]), likes=fmt(r["likes"]),
-                comments=fmt(r["comments"]), ratio=r["ratio"], why=html.escape(r.get("why", ""))))
+                comments=fmt(r["comments"]), ratio=r["ratio"], why=html.escape(r.get("why", "")), format=html.escape(r.get("format", "")), idea=html.escape(r.get("idea", ""))))
     updated = rows[0]["fetched"] if rows else "–"
     page = PAGE.replace("%%ROWS%%", "\n".join(trs)).replace("%%UPDATED%%", html.escape(updated)) \
         .replace("%%COUNT%%", str(len(rows))).replace("%%MAXSUBS%%", fmt(cfg["max_subscribers"])) \
@@ -227,21 +260,21 @@ h1{font-size:22px;margin:0 0 4px}p.meta{color:var(--mut);margin:0 0 16px}
 .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 button{font:inherit;padding:6px 12px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;cursor:pointer}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:8px}
-table{border-collapse:collapse;width:100%;min-width:960px}
+table{border-collapse:collapse;width:100%;min-width:1180px}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 a{color:var(--acc)}.sub{color:var(--mut);font-size:12px}
 tr.sel{background:color-mix(in srgb,var(--acc) 12%,transparent)}
 .note{width:100%;min-width:130px;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--fg)}
-.why{font-size:13px;color:var(--mut);min-width:220px}.foot{color:var(--mut);font-size:13px;margin-top:16px}
+.vid{display:flex;gap:10px;min-width:300px}.vid img{width:96px;height:54px;object-fit:cover;border-radius:4px;flex:none;background:var(--line)}.tag{background:var(--line);padding:1px 6px;border-radius:10px}.idea{min-width:260px;color:var(--fg)}.why{font-size:13px;color:var(--mut);min-width:220px}.foot{color:var(--mut);font-size:13px;margin-top:16px}
 </style></head><body><main>
 <h1>Virální krátká videa (YouTube Shorts)</h1>
-<p class="meta">Aktualizováno: %%UPDATED%% · %%COUNT%% videí z posledních %%DAYS%% dní · autoři do %%MAXSUBS%% odběratelů · řazeno podle poměru zhlédnutí ku odběratelům</p>
+<p class="meta">Aktualizováno: %%UPDATED%% · %%COUNT%% videí z posledních %%DAYS%% dní · zahraniční autoři do %%MAXSUBS%% odběratelů · řazeno podle poměru zhlédnutí ku odběratelům</p>
 <div class="bar"><button id="only">Jen vybraná</button><button id="all">Všechna</button>
 <a href="videos.csv">Stáhnout CSV</a><span id="cnt" class="sub"></span></div>
 <div class="wrap"><table><thead><tr><th></th><th>Video</th><th>Autor</th><th class="n">Odběratelé</th>
-<th class="n">Zhlédnutí</th><th class="n">Lajky</th><th class="n">Komentáře</th><th class="n">Poměr</th><th>Proč to (asi) funguje</th><th>Poznámka</th></tr></thead>
+<th class="n">Zhlédnutí</th><th class="n">Lajky</th><th class="n">Komentáře</th><th class="n">Poměr</th><th>Proč to (asi) funguje</th><th>Jak na to s Fate Magazine</th><th>Poznámka</th></tr></thead>
 <tbody>
 %%ROWS%%
 </tbody></table></div>

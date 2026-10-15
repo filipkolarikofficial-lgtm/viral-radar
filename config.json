@@ -1,51 +1,69 @@
 {
   "days_back": 14,
   "max_duration_seconds": 60,
-  "min_views": 5000,
-  "max_subscribers": 50000,
-  "min_ratio": 3,
-  "results_per_query": 25,
-  "max_rows": 60,
+  "min_views": 20000,
+  "max_subscribers": 30000,
+  "min_ratio": 8,
+  "results_per_query": 30,
+  "max_rows": 40,
   "regions": [
     {
-      "label": "CZ",
-      "regionCode": "CZ",
-      "language": "cs",
-      "queries": "cz",
-      "min_views": 1500,
-      "min_ratio": 2,
-      "order": "relevance"
-    },
-    {
-      "label": "Svět",
+      "label": "US",
       "regionCode": "US",
       "language": "en",
+      "queries": "world"
+    },
+    {
+      "label": "GB",
+      "regionCode": "GB",
+      "language": "en",
+      "queries": "world"
+    },
+    {
+      "label": "DE",
+      "regionCode": "DE",
+      "language": "de",
       "queries": "world"
     }
   ],
   "queries": {
-    "cz": [
-      "pop rock kapela koncert #shorts",
-      "česká kapela zkouška #shorts",
-      "cover písničky česky #shorts",
-      "zpěvačka zpěvák cover česky #shorts",
-      "kytara cover #shorts česky",
-      "bubeník #shorts",
-      "kapela zákulisí #shorts",
-      "nový klip kapela #shorts",
-      "duet česky cover #shorts"
-    ],
     "world": [
-      "band live concert #shorts",
+      "pop rock band live #shorts",
       "band rehearsal #shorts",
-      "backstage band #shorts",
-      "cover song #shorts",
-      "guitar cover #shorts",
+      "band backstage #shorts",
+      "soundcheck band #shorts",
+      "band cover popular song #shorts",
+      "acoustic cover duet #shorts",
+      "female male duet cover #shorts",
+      "guitar solo live #shorts",
+      "drummer live gig #shorts",
       "band reacts #shorts",
-      "drummer #shorts",
-      "small band going viral #shorts"
+      "band funny moment #shorts",
+      "small band festival #shorts",
+      "bilingual cover song #shorts",
+      "band new single #shorts",
+      "musicians jam session #shorts"
     ]
   },
-  "czech_only_for_cz": true,
-  "seed_channels": []
+  "seed_channels": [],
+  "max_per_channel": 2,
+  "exclude_words": [
+    "baby",
+    "kid",
+    "kids",
+    "little boy",
+    "dbd",
+    "dance",
+    "status",
+    "wedding",
+    "hanuman",
+    "bollywood",
+    "arijit",
+    "moose wala",
+    "dangdut",
+    "asmr",
+    "gameplay",
+    "prank",
+    "giveaway"
+  ]
 }
