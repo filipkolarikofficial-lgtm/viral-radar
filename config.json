@@ -11,7 +11,9 @@
       "label": "CZ",
       "regionCode": "CZ",
       "language": "cs",
-      "queries": "cz"
+      "queries": "cz",
+      "min_views": 1500,
+      "min_ratio": 2
     },
     {
       "label": "Svět",

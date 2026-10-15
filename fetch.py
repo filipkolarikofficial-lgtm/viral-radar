@@ -136,13 +136,16 @@ def collect(cfg):
         ch = channels.get(v["snippet"]["channelId"], {})
         hidden = ch.get("hiddenSubscriberCount", False)
         subs = None if hidden or "subscriberCount" not in ch else int(ch["subscriberCount"])
-        if views < cfg["min_views"]:
+        lim = {r["label"]: r for r in cfg["regions"]}.get(ids[vid], {})
+        min_views = lim.get("min_views", cfg["min_views"])
+        min_ratio = lim.get("min_ratio", cfg["min_ratio"])
+        if views < min_views:
             continue
         seed = vid in seed_ids
         if subs is None or (subs > cfg["max_subscribers"] and not seed):
             continue
         ratio = views / max(subs, 1)
-        if ratio < cfg["min_ratio"] and not seed:
+        if ratio < min_ratio and not seed:
             continue
         czech = is_czech(v["snippet"])
         if cfg.get("czech_only_for_cz") and ids[vid] == "CZ" and not czech:
