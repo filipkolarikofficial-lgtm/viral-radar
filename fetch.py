@@ -125,6 +125,12 @@ def collect(cfg):
         for c in res.get("items", []):
             channels[c["id"]] = c["statistics"]
 
+    cz_found = [v for v in videos.values() if is_czech(v["snippet"])]
+    print("Diagnostika: kandidátů %d, z toho česky %d" % (len(videos), len(cz_found)))
+    for v in cz_found[:15]:
+        st = v.get("statistics", {})
+        ch = channels.get(v["snippet"]["channelId"], {})
+        print("  CZ kandidát: %s views=%s subs=%s dur=%s" % (v["snippet"]["title"][:40], st.get("viewCount"), ch.get("subscriberCount"), v["contentDetails"]["duration"]))
     rows = []
     fetched = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     for vid, v in videos.items():
